@@ -6,7 +6,8 @@ Intel and Realtek parts, and the MediaTek *USB* family. If you drop one of these
 an Orin and nothing shows up under `ip link` / `nmcli`, this is why.
 
 This repo builds the missing drivers from the **matching kernel source** and installs them so
-the card works and survives reboots. Verified on an Orin NX 16GB (Waveshare carrier), JP7.2.
+the card works and survives reboots. Verified on an Orin NX 16GB (Waveshare carrier) and an
+Orin Nano 8GB (Holybro carrier) — the drivers apply to any JP7.2 Orin (NX / Nano).
 
 ```bash
 git clone <this-repo> && cd jetson-orin-nx-jp72-wifi
@@ -29,7 +30,7 @@ It does **not** build:
 | Intel AC 8265 / 9000 / AX2xx | `iwlwifi` + `iwlmvm` | ❌ `# CONFIG_IWLWIFI is not set` | ✅ `build-iwlwifi.sh` |
 | MediaTek **MT7612U** (USB, e.g. Alfa AWUS036ACM) | `mt76x2u` | ❌ (mt76 core yes, USB sub-drivers no) | ✅ `build-mt76x2u.sh` |
 | MediaTek MT7921U (USB) | `mt7921u` | ❌ | (same approach, not packaged here) |
-| Realtek RTL8852BE (e.g. Radxa Wireless Module A8) | `rtw89` | ❌ (no `realtek/` dir at all) | (not packaged here) |
+| Realtek **RTL8852BE** (e.g. Radxa Wireless Module A8) | `rtw89` | ❌ (no `realtek/` dir at all) | ✅ `build-rtw89.sh` |
 | MediaTek **MT7922 (M.2/PCIe)** | `mt7921e` | ✅ **works out of the box** | — |
 
 **Buying advice:** if you just want Wi-Fi with zero effort on this platform, get a
@@ -39,6 +40,7 @@ It does **not** build:
 
 - **Intel `iwlwifi`** (MVM family — AC 8260/8265, 9000-series, AX200/AX201/AX210) — PCIe/M.2
 - **MediaTek `mt76x2u`** (MT7612U) — USB
+- **Realtek `rtw89`** (RTL8852BE — e.g. Radxa Wireless Module A8) — PCIe/M.2
 
 ## How it works (short version)
 
@@ -77,6 +79,7 @@ setup.sh                 # detect card(s) -> build -> install -> load
 scripts/00-prereqs.sh    # toolchain + matching kernel source
 scripts/build-iwlwifi.sh # Intel iwlwifi (MVM)
 scripts/build-mt76x2u.sh # MediaTek MT7612U (USB)
+scripts/build-rtw89.sh   # Realtek rtw89 (RTL8852BE, e.g. Radxa A8)
 scripts/verify.sh        # post-install checks
 scripts/lib.sh           # shared helpers
 FINDINGS.md              # full technical write-up / debugging trail

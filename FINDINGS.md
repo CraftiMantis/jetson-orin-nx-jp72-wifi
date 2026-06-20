@@ -137,26 +137,53 @@ iwlwifi 0001:01:00.0: loaded firmware version 36.ca7b901d.0 8265-36.ucode op_mod
 iwlwifi 0001:01:00.0 wlP1p1s0: renamed from wlan0
 ```
 
-## 5. Reboot persistence
+## 5. Realtek rtw89 (RTL8852BE) — the easy contrast
+
+The RTL8852BE (e.g. the Radxa Wireless Module A8) needs the **`rtw89`** driver, and JP7.2's
+kernel ships **no `realtek/` directory at all** — so, like the Intel card, it's missing
+entirely. But unlike iwlwifi, `rtw89` uses **plain `EXPORT_SYMBOL`** — no custom export macro,
+no `IS_ENABLED`-gated externs in the compile path — so it builds clean with just the make vars
+and an include path. **No `-D` defines needed.**
+
+```bash
+SRC=<linux-source>/drivers/net/wireless/realtek/rtw89
+make -C /lib/modules/$(uname -r)/build M=$SRC \
+  CONFIG_RTW89=m CONFIG_RTW89_CORE=m CONFIG_RTW89_PCI=m \
+  CONFIG_RTW89_8852B=m CONFIG_RTW89_8852B_COMMON=m CONFIG_RTW89_8852BE=m \
+  KCFLAGS="-I$SRC" modules
+```
+Produces `rtw89_core/pci/8852b/8852be.ko`. Firmware ships `.zst`
+(`rtw89/rtw8852b_fw*.bin.zst`) — decompress to `.bin`, then `modprobe rtw89_8852be`:
+```
+rtw89_8852be 0001:01:00.0: loaded firmware rtw89/rtw8852b_fw-1.bin
+rtw89_8852be 0001:01:00.0: Firmware version 0.29.29.5 ...
+rtw89_8852be 0001:01:00.0 wlP1p1s0: renamed from wlan0
+```
+(The unrelated `rtl8852bu_fw` errors in dmesg are the card's **Bluetooth** radio, not Wi-Fi.)
+Validated on a Jetson Orin Nano 8GB (Holybro carrier).
+
+## 6. Reboot persistence
 
 Install both `.ko`s to `/lib/modules/$(uname -r)/updates/<driver>/` and run `depmod -a`. The
 module device tables generate `modules.alias` entries (PCI `8086:24fd` → iwlwifi; USB
 `0e8d:7612` → mt76x2u), so udev auto-loads them on boot. Firmware decompressed to disk
 persists. NetworkManager auto-reconnects.
 
-## 6. Generalizing
+## 7. Generalizing
 
 - Other **Intel** cards (9000-series, AX200/201/210) use the same MVM driver — the same build
   works; just make sure their `iwlwifi-*.ucode` firmware is present (decompress all
   `iwlwifi-*.ucode.zst`).
 - **MT7921U** (USB) would follow the MediaTek recipe with `CONFIG_MT7921U=m` (the connac
   chain) instead of the MT76x2 chain.
-- **Realtek `rtw89`** (RTL8852/8922) would need the same `linux-source` + `M=` approach, with
-  its own `CONFIG_RTW89*` set — not packaged here.
+- **Other `rtw89` chips** (8852AE, 8922AE…) follow §5 with their own `CONFIG_RTW89_88xx*` set
+  and matching firmware.
 
-## 7. The one-liner takeaway
+## 8. The one-liner takeaway
 
 > On a Jetson where a driver is *disabled* in the kernel config, build it **out-of-tree with
-> `M=` against the installed build dir**, from the **matching Canonical `linux-source`**, and
-> pass every relevant `CONFIG_*` as a **`-D` preprocessor define** — not just a make variable —
-> because `IS_ENABLED()` reads the preprocessor.
+> `M=` against the installed build dir**, from the **matching Canonical `linux-source`**. Most
+> drivers (mt76, rtw89) build with just the make vars + `-I`; the catch is a driver like
+> iwlwifi that gates code **and its exports** behind `IS_ENABLED(CONFIG_*)` — there you must
+> also pass those `CONFIG_*` as **`-D` preprocessor defines**, because `IS_ENABLED()` reads the
+> preprocessor (`autoconf.h`), not the make variables.
